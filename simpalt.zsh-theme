@@ -1,4 +1,5 @@
 # Based on Roby Russel's agnoster theme
+# https://github.com/agnoster/agnoster-zsh-theme
 # https://github.com/robbyrussell/oh-my-zsh/wiki/themes
 #
 # # Goals
@@ -9,62 +10,69 @@
 
 ### Segment drawing
 # A few utility functions to make it easy and re-usable to draw segmented prompts
+#
+typeset -aHg SIMPALT_PROMPT_SEGMENTS=(
+    prompt_aws_small
+    prompt_status
+    prompt_context
+    prompt_virtualenv
+    prompt_dir_small
+    prompt_git_small
+    prompt_end
+)
+
+### Segment drawing
+# A few utility functions to make it easy and re-usable to draw segmented prompts
 
 CURRENT_BG='NONE'
-SEGMENT_SEPARATOR=''
+if [[ -z "$PRIMARY_FG" ]]; then
+	PRIMARY_FG=black
+fi
 
-## huh dont need this
-collapse_pwd() {
-   # echo $(pwd | sed -e "s,^$HOME,~,")
-   echo $(pwd | sed -e "s,^$HOME,~," | sed "s@\(.\)[^/]*/@\1/@g")
-}
+# Characters
+SEGMENT_SEPARATOR="\ue0b0"
+PLUSMINUS="\u00b1"
+BRANCH="\ue0a0"
+DETACHED="\u27a6"
+CROSS="\u2718"
+LIGHTNING="\u26a1"
+GEAR="\u2699"
 
 # Begin a segment
 # Takes two arguments, background and foreground. Both can be omitted,
 # rendering default background/foreground.
-__simpalt_prompt_segment() {
+prompt_segment() {
   local bg fg
   [[ -n $1 ]] && bg="%K{$1}" || bg="%k"
   [[ -n $2 ]] && fg="%F{$2}" || fg="%f"
   if [[ $CURRENT_BG != 'NONE' && $1 != $CURRENT_BG ]]; then
-    echo -n " %{$bg%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR%{$fg%} "
+    [[ "${PADDED}" == "TRUE" ]] && [[ "${4}" != "stick" ]] && print -n " "
+    print -n "%{$bg%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR%{$fg%}"
+    PADDED='FALSE'
   else
-    echo -n "%{$bg%}%{$fg%} "
+    print -n "%{$bg%}%{$fg%}"
   fi
   CURRENT_BG=$1
-  [[ -n $3 ]] && echo -n $3
-}
-
-__simpalt_prompt_segment_small() {
-  local bg fg
-  [[ -n $1 ]] && bg="%K{$1}" || bg="%k"
-  if [[ $CURRENT_BG != 'NONE' && $1 != $CURRENT_BG ]]; then
-    echo -n "%{$bg%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR%{$fg%}"
-  else
-    echo -n "%{$bg%}%{$fg%}"
+  if [[ -n $3 ]];then
+    if [[ "${4}" == "pad" ]]; then
+      print -n " "
+      PADDED='TRUE'
+    else
+      PADDED='FALSE'
+    fi
+    print -n $3
   fi
-  CURRENT_BG=$1
 }
 
 # End the prompt, closing any open segments
-__simpalt_prompt_end() {
+prompt_end() {
   if [[ -n $CURRENT_BG ]]; then
-    echo -n " %{%k%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR"
+    [[ "${PADDED}" == "TRUE" ]] && print -n " "
+    print -n "%{%k%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR"
   else
-    echo -n "%{%k%}"
+    print -n "%{%k%}"
   fi
-  echo -n "%{%f%}"
-  CURRENT_BG=''
-}
-
-# End the prompt, closing any open segments
-__simpalt_prompt_end_small() {
-  if [[ -n $CURRENT_BG ]]; then
-    echo -n "%{%k%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR"
-  else
-    echo -n "%{%k%}"
-  fi
-  echo -n "%{%f%}"
+  print -n "%{%f%}"
   CURRENT_BG=''
 }
 
@@ -72,11 +80,86 @@ __simpalt_prompt_end_small() {
 # Each component will draw itself, and hide itself if no information needs to be shown
 
 # Context: user@hostname (who am I and where am I)
-__simpalt_prompt_context() {
-  local user=`whoami`
+prompt_context() {
+  local context user=`whoami`
 
-  if [[ "$user" != "$DEFAULT_USER" || -n "$SSH_CLIENT" ]]; then
-    __simpalt_prompt_segment black default "%(!.%{%F{yellow}%}.)$COMPUTER_SYMBOL"
+  if [[ "$user" != "$DEFAULT_USER" || -n "$SSH_CONNECTION" ]]; then
+    [[ -n "${COMPUTER_SYMBOL}" ]] && context="${COMPUTER_SYMBOL}" || context="$user@%m"
+    prompt_segment $PRIMARY_FG default "%(!.%{%F{yellow}%}.)$context" pad
+  fi
+}
+
+# Git: branch/detached head, dirty status
+prompt_git() {
+  local color ref
+  is_dirty() {
+    test -n "$(git status --porcelain --ignore-submodules)"
+  }
+  ref="$vcs_info_msg_0_"
+  if [[ -n "$ref" ]]; then
+    if is_dirty; then
+      color=yellow
+      ref="${ref} $PLUSMINUS"
+    else
+      color=green
+      ref="${ref} "
+    fi
+    if [[ "${ref/.../}" == "$ref" ]]; then
+      ref="$BRANCH $ref"
+    else
+      ref="$DETACHED ${ref/.../}"
+    fi
+    prompt_segment $color $PRIMARY_FG
+    print -n " ${ref}"
+    PADDED='TRUE'
+  fi
+}
+
+prompt_git_small() {
+  local ref
+  is_dirty() {
+    test -n "$(git status --porcelain --ignore-submodules)"
+  }
+  ref="$vcs_info_msg_0_"
+  if [[ -n "$ref" ]]; then
+    if [[ "${ref/.../}" != "$ref" ]]; then
+      prompt_segment red default "" stick
+    else
+      if [[ "${ref}" != "master" ]]; then
+        [[ "${PADDED}" != "TRUE" ]] && print -n " "
+        print -n "$BRANCH"
+      fi
+
+      if is_dirty; then
+        prompt_segment yellow default "" stick
+      else
+        prompt_segment green default "" stick
+      fi
+    fi
+  else
+    prompt_segment blue default "" stick
+  fi
+}
+
+# AWS: current aws-vault session
+prompt_aws() {
+  [[ $AWS_VAULT ]] && prompt_segment magenta $PRIMARY_FG " $AWS_VAULT" pad
+}
+
+prompt_aws_small() {
+  [[ $AWS_VAULT ]] && prompt_segment black default "%{%F{magenta}%}" pad
+}
+
+# Dir: current working directory
+prompt_dir() {
+  prompt_segment blue $PRIMARY_FG '%~' pad
+}
+
+prompt_dir_small() {
+  if [[ "$PWD" == "$HOME" ]]; then
+    prompt_segment black default '~' pad
+  else
+    prompt_segment black default "$(basename $PWD)" pad
   fi
 }
 
@@ -84,101 +167,53 @@ __simpalt_prompt_context() {
 # - was there an error
 # - am I root
 # - are there background jobs?
-__simpalt_prompt_status() {
+prompt_status() {
   local symbols
   symbols=()
-  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}✘"
-  [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}⚡"
-  [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}⚙"
+  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}$CROSS"
+  [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}$LIGHTNING"
+  [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}$GEAR"
 
-  [[ -n "$symbols" ]] && __simpalt_prompt_segment black default "$symbols"
+  [[ -n "$symbols" ]] && prompt_segment $PRIMARY_FG default "$symbols" pad
 }
 
-__simpalt_prompt_aws() {
-  [[ $AWS_VAULT ]] && __simpalt_prompt_segment magenta black " $AWS_VAULT"
-}
-
-__simpalt_prompt_aws_small() {
-  [[ $AWS_VAULT ]] && __simpalt_prompt_segment black default "%{%F{magenta}%}"
-}
-
-# Git: branch/detached head, dirty status
-__simpalt_prompt_git() {
-  local ref dirty
-  if $(git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
-    ZSH_THEME_GIT_PROMPT_DIRTY='±'
-    dirty=$(parse_git_dirty)
-    ref=$(git symbolic-ref HEAD 2> /dev/null) || ref="➦ $(git show-ref --head -s --abbrev |head -n1 2> /dev/null)"
-    if [[ -n $dirty ]]; then
-      __simpalt_prompt_segment yellow black
-    else
-      __simpalt_prompt_segment green black
-    fi
-    echo -n "${ref/refs\/heads\// }$dirty"
-  fi
-}
-
-__simpalt_prompt_git_small() {
-  local ref dirty
-  if $(git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
-    ref=$(git symbolic-ref HEAD 2> /dev/null)
-    if [ ! $ref ]; then
-      __simpalt_prompt_segment_small red
-    else
-      if [[ "refs/heads/master" != "$ref" ]]; then
-        __simpalt_prompt_segment black default ""
-      fi
-      dirty=$(parse_git_dirty)
-      if [[ -n $dirty ]]; then
-        __simpalt_prompt_segment_small yellow
-      else
-        __simpalt_prompt_segment_small green
-      fi
-    fi
-  else
-    __simpalt_prompt_segment_small blue
-  fi
-}
-
-# Dir: current working directory
-__simpalt_prompt_dir() {
-  __simpalt_prompt_segment blue black '%~'
-}
-
-__simpalt_prompt_dir_small() {
-  if [[ "$PWD" != "$HOME" ]]; then
-    __simpalt_prompt_segment black default "$(basename $PWD)"
-  else
-    __simpalt_prompt_segment black default "~"
+# Display current virtual environment
+prompt_virtualenv() {
+  if [[ -n $VIRTUAL_ENV ]]; then
+    color=cyan
+    prompt_segment $color $PRIMARY_FG
+    print -Pn " $(basename $VIRTUAL_ENV)"
+    PADDED='TRUE'
   fi
 }
 
 ## Main prompt
-build_prompt() {
+prompt_simpalt_main() {
   RETVAL=$?
-  if [ $SIMPALT_LPWD ]; then
-    __simpalt_prompt_status
-    __simpalt_prompt_aws
-    __simpalt_prompt_context
-    __simpalt_prompt_dir
-    __simpalt_prompt_git
-    __simpalt_prompt_end
-  else
-    __simpalt_prompt_status
-    __simpalt_prompt_aws_small
-    __simpalt_prompt_context
-    __simpalt_prompt_dir_small
-    __simpalt_prompt_git_small
-    __simpalt_prompt_end_small
-  fi
+  CURRENT_BG='NONE'
+  PADDED='FALSE'
+  for prompt_segment in "${SIMPALT_PROMPT_SEGMENTS[@]}"; do
+    [[ -n $prompt_segment ]] && $prompt_segment
+  done
 }
 
-pw() {
-  if [ $SIMPALT_LPWD ]; then
-    unset SIMPALT_LPWD
-  else
-    export SIMPALT_LPWD=1
-  fi
+prompt_simpalt_precmd() {
+  vcs_info
+  PROMPT='%{%f%b%k%}$(prompt_simpalt_main) '
 }
 
-PROMPT='%{%f%b%k%}$(build_prompt) '
+prompt_simpalt_setup() {
+  autoload -Uz add-zsh-hook
+  autoload -Uz vcs_info
+
+  prompt_opts=(cr subst percent)
+
+  add-zsh-hook precmd prompt_simpalt_precmd
+
+  zstyle ':vcs_info:*' enable git
+  zstyle ':vcs_info:*' check-for-changes false
+  zstyle ':vcs_info:git*' formats '%b'
+  zstyle ':vcs_info:git*' actionformats '%b (%a)'
+}
+
+prompt_simpalt_setup "$@"
