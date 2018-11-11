@@ -10,18 +10,17 @@
 
 ### Segment drawing
 # A few utility functions to make it easy and re-usable to draw segmented prompts
-#
+
 typeset -aHg SIMPALT_PROMPT_SEGMENTS=(
-    prompt_aws_small
+    prompt_aws
     prompt_status
     prompt_context
     prompt_virtualenv
-    prompt_dir_small
-    prompt_git_small
+    prompt_dir
+    prompt_git
 )
 
-### Segment drawing
-# A few utility functions to make it easy and re-usable to draw segmented prompts
+typeset -g SIMPALT_SMALL='ON'
 
 CURRENT_BG='NONE'
 if [[ -z "$PRIMARY_FG" ]]; then
@@ -90,75 +89,73 @@ prompt_context() {
 
 # Git: branch/detached head, dirty status
 prompt_git() {
-  local color ref
-  is_dirty() {
-    test -n "$(git status --porcelain --ignore-submodules)"
-  }
-  ref="$vcs_info_msg_0_"
-  if [[ -n "$ref" ]]; then
-    if is_dirty; then
-      color=yellow
-      ref="${ref} $PLUSMINUS"
-    else
-      color=green
-      ref="${ref} "
-    fi
-    if [[ "${ref/.../}" == "$ref" ]]; then
-      ref="$BRANCH $ref"
-    else
-      ref="$DETACHED ${ref/.../}"
-    fi
-    prompt_segment $color $PRIMARY_FG
-    print -n " ${ref}"
-    PADDED='TRUE'
-  fi
-}
-
-prompt_git_small() {
-  local ref
-  is_dirty() {
-    test -n "$(git status --porcelain --ignore-submodules)"
-  }
-  ref="$vcs_info_msg_0_"
-  if [[ -n "$ref" ]]; then
-    if [[ "${ref/.../}" != "$ref" ]]; then
-      prompt_segment red default "" stick
-    else
-      if [[ "${ref}" != "master" ]]; then
-        [[ "${PADDED}" != "TRUE" ]] && print -n " "
-        print -n "$BRANCH"
-      fi
-
-      if is_dirty; then
-        prompt_segment yellow default "" stick
+  if [ $SIMPALT_SMALL ]; then
+    local ref
+    is_dirty() {
+      test -n "$(git status --porcelain --ignore-submodules)"
+    }
+    ref="$vcs_info_msg_0_"
+    if [[ -n "$ref" ]]; then
+      if [[ "${ref/.../}" != "$ref" ]]; then
+        prompt_segment red default "" stick
       else
-        prompt_segment green default "" stick
+        if [[ "${ref}" != "master" ]]; then
+          [[ "${PADDED}" != "TRUE" ]] && print -n " "
+          print -n "$BRANCH"
+        fi
+
+        if is_dirty; then
+          prompt_segment yellow default "" stick
+        else
+          prompt_segment green default "" stick
+        fi
       fi
+    else
+      prompt_segment blue default "" stick
     fi
   else
-    prompt_segment blue default "" stick
+    local color ref
+    is_dirty() {
+      test -n "$(git status --porcelain --ignore-submodules)"
+    }
+    ref="$vcs_info_msg_0_"
+    if [[ -n "$ref" ]]; then
+      if is_dirty; then
+        color=yellow
+        ref="${ref} $PLUSMINUS"
+      else
+        color=green
+        ref="${ref} "
+      fi
+      if [[ "${ref/.../}" == "$ref" ]]; then
+        ref="$BRANCH $ref"
+      else
+        ref="$DETACHED ${ref/.../}"
+      fi
+      prompt_segment $color $PRIMARY_FG
+      print -n " ${ref}"
+      PADDED='TRUE'
+    fi
   fi
 }
 
 # AWS: current aws-vault session
 prompt_aws() {
-  [[ $AWS_VAULT ]] && prompt_segment magenta $PRIMARY_FG " $AWS_VAULT" pad
-}
-
-prompt_aws_small() {
-  [[ $AWS_VAULT ]] && prompt_segment black default "%{%F{magenta}%}" pad
+  if [ $AWS_VAULT ]; then
+    [ $SIMPALT_SMALL ] && prompt_segment black default "%{%F{magenta}%}" pad || prompt_segment magenta $PRIMARY_FG " $AWS_VAULT" pad
+  fi
 }
 
 # Dir: current working directory
 prompt_dir() {
-  prompt_segment blue $PRIMARY_FG '%~' pad
-}
-
-prompt_dir_small() {
-  if [[ "$PWD" == "$HOME" ]]; then
-    prompt_segment black default '~' pad
+  if [ $SIMPALT_SMALL ]; then
+    if [[ "$PWD" == "$HOME" ]]; then
+      prompt_segment black default '~' pad
+    else
+      prompt_segment black default "$(basename $PWD)" pad
+    fi
   else
-    prompt_segment black default "$(basename $PWD)" pad
+    prompt_segment blue $PRIMARY_FG '%~' pad
   fi
 }
 
