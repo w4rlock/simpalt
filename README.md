@@ -3,11 +3,8 @@ Simpalt
 
 A ZSH theme based on [agnoster](https://github.com/agnoster/agnoster-zsh-theme) with focus on screen realstate
 
-###### Sample
-![Samaple](img/sample.png)
-
 ###### Demo
-[![asciicast](https://asciinema.org/a/gYRKD3Hdv9dvcZ6JiCyWlvhkM.svg)](https://asciinema.org/a/gYRKD3Hdv9dvcZ6JiCyWlvhkM)
+[![Demo](img/demo.png)](https://asciinema.org/a/gYRKD3Hdv9dvcZ6JiCyWlvhkM)
 
 How to use it
 ---------------------
