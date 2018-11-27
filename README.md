@@ -4,7 +4,7 @@ Simpalt
 A ZSH theme based on [agnoster](https://github.com/agnoster/agnoster-zsh-theme) with focus on screen realstate
 
 ###### Demo
-[![Demo](img/demo.png)](https://asciinema.org/a/gYRKD3Hdv9dvcZ6JiCyWlvhkM)
+[![Demo](img/simple.png)](https://asciinema.org/a/gYRKD3Hdv9dvcZ6JiCyWlvhkM)
 
 How to use it
 ---------------------
